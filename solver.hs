@@ -53,14 +53,15 @@ replaceVal' board pos val = take pos board ++ val : drop (pos+1) board
 -- inicializa la tabla infiriendo algunos valores a partir de las pistas n, 1 y 1<pista<n
 initialization::Board->[Int]->Int->Int->Board
 initialization b [] _ _ = b
-initialization b (c:clues) n ci
-  | c == n = initialization (test b 1 cellIndices) clues n $ ci+1
-  | c == 1 = initialization (replaceVal' b (head cellIndices) [n]) clues n $ ci+1
-  | 1 < c && c < n = initialization (other cellIndices 0 n c b) clues n $ ci+1
-  | otherwise = initialization b clues n $ ci+1
+initialization b (c:clues) n ci = initialization (fn c) clues n $ ci+1
   where cellIndices = cellIndexFromClueIndex ci n
+        fn 1 = replaceVal' b (head cellIndices) [n]
+        fn c
+          | c == n = test b 1 cellIndices
+          | 1 < c && c < n = other cellIndices 0 n c b
+          | otherwise = b
 
--- cluesIndex es el arreblo de posiciones relacionadas a la pista
+-- cluesIndex es el arreglo de posiciones relacionadas a la pista
 -- i es la posicion del arreglo de posiciones iniciando desde 0
 other::[Int]->Int->Int->Int->Board->Board
 other [] _ _ _ board = board
@@ -106,11 +107,11 @@ makeAllUniqueSequences [] = [[]]
 makeAllUniqueSequences (x:xs) = [ x':y' | x' <- x, y' <- y, x' `notElem` y']
   where y = makeAllUniqueSequences xs
 
-generatePossibleSequences::Board->[Int]->Int->Int->Board
-generatePossibleSequences board cellIndices clue opClue = filter (f) sequences
-  where combination = makeAllUniqueSequences $ map (board!!) cellIndices
-        sequences = filter (passClueCheck clue) combination
-        f = passClueCheck opClue . reverse
+generatePossibleSequences::Int->Int->[[Int]]->[[Int]]
+generatePossibleSequences 0 0 = id
+generatePossibleSequences clue 0 = filter (passClueCheck clue)
+generatePossibleSequences 0 opClue = filter (passClueCheck opClue . reverse)
+generatePossibleSequences clue opClue = filter (passClueCheck opClue . reverse) . filter (passClueCheck clue)
 
 -- combina el grupo de sequencias filtradas para generar nuevos posibles soluciones
 -- ejemplo:[[1,2,4,3],[2,3,4,1]] => [[1,2],[2,3],[4],[3,1]]
@@ -141,7 +142,7 @@ prueba board [] _ _ = board
 prueba board (ci:clueIndices) n clues = prueba boardWithSequence clueIndices n clues
   where cellIndices = cellIndexFromClueIndex ci n
         boardWithSequence = applyCells (combinerSeq possibleSequences) cellIndices board
-        possibleSequences = generatePossibleSequences board cellIndices (clues!!ci) $ clues!!(ci+n) 
+        possibleSequences = generatePossibleSequences (clues!!ci) (clues!!(ci+n)) . makeAllUniqueSequences . map (board!!) $ cellIndices
 
 -- Esta funcion debe ejecutarse luego de haber aplicado la primera etapa de la aplicacion de restricciones es decir la inializacion
 -- el bucle se realizara hasta que ya no se realicen mas cambios en la tabla
